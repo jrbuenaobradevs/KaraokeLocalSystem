@@ -1,7 +1,10 @@
 fastapi==0.110.0
 uvicorn[standard]==0.51.0
-sqlalchemy==2.0.28
+sqlalchemy==2.0.51
 pydantic==2.13.4
 watchdog==3.0.0
 qrcode==7.4.0
 pillow==12.3.0
+pytest==7.4.0
+requests==2.32.4
+httpx==0.24.1
