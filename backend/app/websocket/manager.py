@@ -19,16 +19,7 @@ def unregister(ws: WebSocket):
 
 
 async def broadcast_library_updated(result: dict):
-    payload = {"event": "library_updated", "result": result}
-    to_remove = []
-    for ws in list(_connections):
-        try:
-            await ws.send_json(payload)
-        except Exception:
-            logger.exception('Failed to send websocket message')
-            to_remove.append(ws)
-    for ws in to_remove:
-        unregister(ws)
+    await broadcast_event('library_updated', {"result": result})
 
 
 def notify_library_updated(result: dict):
@@ -41,3 +32,27 @@ def notify_library_updated(result: dict):
         asyncio.run_coroutine_threadsafe(broadcast_library_updated(result), loop)
     except Exception:
         logger.exception('Failed to schedule websocket broadcast')
+
+
+async def broadcast_event(event: str, payload: dict):
+    data = {"event": event, **(payload or {})}
+    to_remove = []
+    for ws in list(_connections):
+        try:
+            await ws.send_json(data)
+        except Exception:
+            logger.exception('Failed to send websocket message')
+            to_remove.append(ws)
+    for ws in to_remove:
+        unregister(ws)
+
+
+def notify_event(event: str, payload: dict):
+    global loop
+    if loop is None:
+        logger.debug('No event loop for websocket broadcasts')
+        return
+    try:
+        asyncio.run_coroutine_threadsafe(broadcast_event(event, payload), loop)
+    except Exception:
+        logger.exception('Failed to schedule websocket event')

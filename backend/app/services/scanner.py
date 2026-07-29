@@ -25,6 +25,8 @@ def parse_filename(path: Path) -> tuple[str, str]:
 def scan_media(media_dir: str = 'media', db_session: Optional[SessionLocal] = None) -> dict:
     created = 0
     removed = 0
+    created_ids: list[int] = []
+    removed_ids: list[int] = []
     media_path = Path(media_dir)
     files = []
     if media_path.exists() and media_path.is_dir():
@@ -60,15 +62,20 @@ def scan_media(media_dir: str = 'media', db_session: Optional[SessionLocal] = No
                 created_at=datetime.datetime.utcnow(),
             )
             db.add(song)
+            # flush to get id
+            db.flush()
+            db.refresh(song)
+            created_ids.append(song.id)
             created += 1
         # delete songs whose files are missing
         for fname, song in existing.items():
             if fname not in file_names:
+                removed_ids.append(song.id)
                 db.delete(song)
                 removed += 1
         if created or removed:
             db.commit()
-        return {"created": created, "removed": removed, "scanned": len(files)}
+        return {"created": created, "created_ids": created_ids, "removed": removed, "removed_ids": removed_ids, "scanned": len(files)}
     finally:
         if not external_db:
             db.close()
