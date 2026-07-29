@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from .utils.logger import logger
 from .services import scanner, watcher, player
 from .websocket import manager as ws_manager
+from .frontend import mount_frontend
 import asyncio
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -26,6 +27,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+mount_frontend(app)
 
 
 _media_watcher = None

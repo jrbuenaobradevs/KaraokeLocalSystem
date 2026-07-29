@@ -5,7 +5,7 @@ export function useWebsocket(onMessage: (event: DashboardEvent) => void) {
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    const base = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
+    const base = import.meta.env.VITE_API_BASE ?? window.location.origin;
     const wsUrl = base.replace(/^http/, 'ws') + '/ws/library';
     const socket = new WebSocket(wsUrl);
     socketRef.current = socket;
