@@ -6,6 +6,10 @@ from .models import Song, QueueItem, PlaybackLog
 from . import schemas
 from sqlalchemy.orm import Session
 from .utils.logger import logger
+from .services import scanner, watcher
+from .websocket import manager as ws_manager
+import asyncio
+from fastapi import WebSocket, WebSocketDisconnect
 
 Base.metadata.create_all(bind=engine)
 
@@ -19,6 +23,44 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+_media_watcher = None
+
+
+@app.on_event('startup')
+def _startup():
+    global _media_watcher
+    try:
+        _media_watcher = watcher.start_watcher('media')
+    except Exception:
+        logger.exception('Failed to start media watcher')
+    # capture event loop for websocket broadcasts
+    try:
+        ws_manager.loop = asyncio.get_event_loop()
+    except Exception:
+        logger.exception('Failed to set websocket event loop')
+
+
+@app.on_event('shutdown')
+def _shutdown():
+    global _media_watcher
+    if _media_watcher is not None:
+        watcher.stop_watcher(_media_watcher)
+
+
+@app.websocket('/ws/library')
+async def websocket_library(ws: WebSocket):
+    await ws.accept()
+    ws_manager.register(ws)
+    try:
+        while True:
+            # keep connection alive; clients may send pings
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        ws_manager.unregister(ws)
 
 
 def get_db():
@@ -100,8 +142,8 @@ def skip():
 
 @app.post('/library/rescan')
 def rescan_library():
-    # placeholder for media scanning implementation
-    return {"status": "rescan_started"}
+    result = scanner.rescan_and_report('media')
+    return {"status": "rescan_finished", "result": result}
 
 
 @app.get('/stats')
