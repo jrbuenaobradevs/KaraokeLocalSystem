@@ -34,6 +34,36 @@ def notify_library_updated(result: dict):
         logger.exception('Failed to schedule websocket broadcast')
 
 
+async def broadcast_queue_updated(queue: list[dict]):
+    await broadcast_event('queue_updated', {"queue": queue})
+
+
+def notify_queue_updated(queue: list[dict]):
+    global loop
+    if loop is None:
+        logger.debug('No event loop for websocket broadcasts')
+        return
+    try:
+        asyncio.run_coroutine_threadsafe(broadcast_queue_updated(queue), loop)
+    except Exception:
+        logger.exception('Failed to schedule websocket broadcast')
+
+
+async def broadcast_player_state(state: dict):
+    await broadcast_event('player_state', {"state": state})
+
+
+def notify_player_state(state: dict):
+    global loop
+    if loop is None:
+        logger.debug('No event loop for websocket broadcasts')
+        return
+    try:
+        asyncio.run_coroutine_threadsafe(broadcast_player_state(state), loop)
+    except Exception:
+        logger.exception('Failed to schedule websocket broadcast')
+
+
 async def broadcast_event(event: str, payload: dict):
     data = {"event": event, **(payload or {})}
     to_remove = []

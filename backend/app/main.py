@@ -122,6 +122,12 @@ def add_queue(item: schemas.QueueItemCreate, db: Session = Depends(get_db)):
     db.add(qi)
     db.commit()
     db.refresh(qi)
+    try:
+        from .services.queue_state import get_queue_state, get_player_state
+        ws_manager.notify_queue_updated(get_queue_state())
+        ws_manager.notify_player_state(get_player_state())
+    except Exception:
+        logger.exception('Failed to notify websocket state after queue add')
     return qi
 
 
@@ -137,6 +143,12 @@ def delete_queue(item_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail='Queue item not found')
     db.delete(item)
     db.commit()
+    try:
+        from .services.queue_state import get_queue_state, get_player_state
+        ws_manager.notify_queue_updated(get_queue_state())
+        ws_manager.notify_player_state(get_player_state())
+    except Exception:
+        logger.exception('Failed to notify websocket state after queue delete')
     return
 
 
@@ -158,6 +170,12 @@ def move_queue(item_id: int, position: int, db: Session = Depends(get_db), _: No
         it.requested_at = now + datetime.timedelta(seconds=i)
         db.add(it)
     db.commit()
+    try:
+        from .services.queue_state import get_queue_state, get_player_state
+        ws_manager.notify_queue_updated(get_queue_state())
+        ws_manager.notify_player_state(get_player_state())
+    except Exception:
+        logger.exception('Failed to notify websocket state after queue move')
     return {"status": "moved"}
 
 
@@ -165,6 +183,12 @@ def move_queue(item_id: int, position: int, db: Session = Depends(get_db), _: No
 def clear_queue(db: Session = Depends(get_db), _: None = Depends(admin_guard)):
     db.query(QueueItem).delete()
     db.commit()
+    try:
+        from .services.queue_state import get_queue_state, get_player_state
+        ws_manager.notify_queue_updated(get_queue_state())
+        ws_manager.notify_player_state(get_player_state())
+    except Exception:
+        logger.exception('Failed to notify websocket state after queue clear')
     return {"status": "cleared"}
 
 
@@ -173,6 +197,11 @@ def play(_: None = Depends(admin_guard)):
     try:
         player.playback_controller.resume()
         player.playback_controller.start()
+        try:
+            from .services.queue_state import get_player_state
+            ws_manager.notify_player_state(get_player_state())
+        except Exception:
+            logger.exception('Failed to notify websocket player state after play')
         return {"status": "playing"}
     except Exception:
         logger.exception('Play failed')
@@ -183,6 +212,11 @@ def play(_: None = Depends(admin_guard)):
 def pause(_: None = Depends(admin_guard)):
     try:
         player.playback_controller.pause()
+        try:
+            from .services.queue_state import get_player_state
+            ws_manager.notify_player_state(get_player_state())
+        except Exception:
+            logger.exception('Failed to notify websocket player state after pause')
         return {"status": "paused"}
     except Exception:
         logger.exception('Pause failed')
@@ -193,10 +227,26 @@ def pause(_: None = Depends(admin_guard)):
 def skip(_: None = Depends(admin_guard)):
     try:
         player.playback_controller.skip()
+        try:
+            from .services.queue_state import get_queue_state, get_player_state
+            ws_manager.notify_queue_updated(get_queue_state())
+            ws_manager.notify_player_state(get_player_state())
+        except Exception:
+            logger.exception('Failed to notify websocket state after skip')
         return {"status": "skipped"}
     except Exception:
         logger.exception('Skip failed')
         raise HTTPException(status_code=500, detail='Failed to skip')
+
+
+@app.get('/player/state')
+def player_state():
+    try:
+        from .services.queue_state import get_player_state
+        return get_player_state()
+    except Exception:
+        logger.exception('Failed to load player state')
+        raise HTTPException(status_code=500, detail='Failed to retrieve player state')
 
 
 @app.post('/library/rescan')

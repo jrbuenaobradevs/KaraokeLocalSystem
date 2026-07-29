@@ -54,6 +54,9 @@ class PlaybackController:
     def get_current(self):
         return self._current_item_id
 
+    def is_paused(self) -> bool:
+        return self._pause.is_set()
+
     def estimated_wait_seconds(self, queue_item_id: Optional[int] = None) -> float:
         db = SessionLocal()
         try:
@@ -109,6 +112,9 @@ class PlaybackController:
                 # notify websocket song_started
                 try:
                     ws_manager.notify_event('song_started', {'song_id': item.song_id, 'queue_item_id': item.id, 'singer': item.singer})
+                    from .queue_state import get_queue_state, get_player_state
+                    ws_manager.notify_queue_updated(get_queue_state())
+                    ws_manager.notify_player_state(get_player_state())
                 except Exception:
                     logger.exception('Failed to notify song_started')
 
@@ -132,6 +138,9 @@ class PlaybackController:
                 # notify websocket song_finished
                 try:
                     ws_manager.notify_event('song_finished', {'song_id': item.song_id, 'queue_item_id': item.id, 'singer': item.singer})
+                    from .queue_state import get_queue_state, get_player_state
+                    ws_manager.notify_queue_updated(get_queue_state())
+                    ws_manager.notify_player_state(get_player_state())
                 except Exception:
                     logger.exception('Failed to notify song_finished')
 
